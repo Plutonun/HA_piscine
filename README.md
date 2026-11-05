@@ -58,16 +58,28 @@ C'est la méthode la plus propre et la plus rapide.
    ```
 2. Créez un dossier nommé `packages` à la racine de votre configuration (au même niveau que `configuration.yaml`).
 3. Dans ce nouveau dossier, créez un fichier nommé `pca_helpers.yaml` et collez-y l'intégralité du code fourni dans le dossier `packages/` de ce dépôt.
-4. Redémarrez Home Assistant (`Outils de développement > Redémarrer`). Vos 8 entités sont créées !
+4. Modifier le switch pour votre pompe
+5. Redémarrez Home Assistant (`Outils de développement > Redémarrer`). Vos 8 entités sont créées !
 
 <details>
 <summary><b>🔧 Méthode Alternative (Manuelle via l'interface)</b></summary>
+
 Si vous ne souhaitez pas utiliser le YAML, vous pouvez créer ces 8 entités manuellement depuis `Paramètres > Appareils et services > Entrées` :
-- <b>4x Interrupteurs booléens</b> : piscine_verrou_defaut, piscine_mem_canicule, piscine_mem_gel, piscine_mem_hivernage
-- <b>1x Liste déroulante</b> : piscine_mode (Options : Courbe, Hivernage, Automatique, Forcé, Inactif)
-- <b>1x Nombre</b> : piscine_duree_calculee (Min:0, Max:24, Pas:0.1)
-- <b>1x Date et/ou Heure</b> : piscine_fin_filtration (Activer Date ET Heure)
-- <b>1x Bouton</b> : piscine_recalculer
+
+*   **Interrupteurs booléens (`input_boolean`) :**
+    *   `input_boolean.piscine_verrou_defaut` (Partagé entre Logic et Safety)
+    *   `input_boolean.piscine_mem_canicule`
+    *   `input_boolean.piscine_mem_gel`
+    *   `input_boolean.piscine_mem_hivernage`
+*   **Liste déroulante (`input_select`) :**
+    *   `input_select.piscine_mode` (Options : *Courbe, Hivernage, Automatique, Forcé, Inactif*)
+*   **Nombre (`input_number`) :**
+    *   `input_number.piscine_duree_calculee` (Min: 0, Max: 24, Pas: 0.1)
+*   **Date et Heure (`input_datetime`) :**
+    *   `input_datetime.piscine_fin_filtration` (Mode: Date et Heure)
+*   **Bouton (`input_button`) :**
+    *   `input_button.piscine_recalculer`
+
 </details>
 
 ### Étape 2 : Importation des Blueprints
