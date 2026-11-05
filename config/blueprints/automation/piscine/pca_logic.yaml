@@ -1,0 +1,652 @@
+blueprint:
+  name: "⭐ Pool Control Automation (PCA) - Logic Engine ⭐"
+  description: |
+    # 🏊 Pool Control Automation (PCA) v2026.1
+    Moteur prédictif sans état pour le calcul des durées, la régulation thermique et l'ordonnancement.
+
+    ### 📦 Entités du package associées :
+    * **Mode** : `input_select.piscine_mode`
+    * **Fin prévue** : `input_datetime.piscine_fin_filtration`
+    * **Durée calculée** : `input_number.piscine_duree_calculee`
+    * **Bouton Recalcul** : `input_button.piscine_recalculer`
+    * **Verrou partagé** : `input_boolean.piscine_verrou_defaut`
+    * **Mémoires d'état** :
+      - `input_boolean.piscine_mem_canicule`
+      - `input_boolean.piscine_mem_gel`
+      - `input_boolean.piscine_mem_hivernage`
+
+  author: "Plutonun"
+  domain: automation
+  homeassistant:
+    min_version: "2024.10.0"
+
+  input:
+    switch_pompe:
+      name: "🔌 Pompe de filtration"
+      description: >-
+        Entité commandant la pompe de filtration.
+        <br />💡 <em>Exemple : <code>switch.pompe_piscine</code></em>
+      selector:
+        entity:
+          filter:
+            domain: [switch, light, input_boolean]
+          multiple: false
+    temperature_piscine:
+      name: "🌡️ Sonde de température de l'eau"
+      description: >-
+        Capteur de température du bassin.
+        <br />💡 <em>Exemple : <code>sensor.temperature_piscine</code></em>
+      selector:
+        entity:
+          filter:
+            domain: sensor
+            device_class: temperature
+          multiple: false
+    temperature_air:
+      name: "❄️ Sonde de l'air (Optionnel)"
+      description: >-
+        Capteur météo extérieur pour anticipation du gel.
+        <br />💡 <em>Exemple : <code>sensor.temperature_exterieure</code></em>
+      default: ""
+      selector:
+        entity:
+          filter:
+            domain: sensor
+            device_class: temperature
+          multiple: false
+
+    # === OPTIONS ===
+    feature_section:
+      name: "⚙️ Options d'automatisation"
+      icon: mdi:tune
+      collapsed: false
+      input:
+        features_enabled:
+          name: "👉 Sécurités thermiques actives"
+          default: ["enable_frost", "enable_heatwave"]
+          selector:
+            select:
+              options:
+                - label: "❄️ Protection Hors-gel"
+                  value: "enable_frost"
+                - label: "🔥 Protection Canicule"
+                  value: "enable_heatwave"
+              multiple: true
+              mode: list
+        mode_filtration:
+          name: "🎛️ Mode de filtration"
+          description: >-
+            Entité input_select définissant le mode.
+            <br />👉 <strong>Entité du package :</strong> <code>input_select.piscine_mode</code>
+          selector:
+            entity:
+              filter:
+                domain: input_select
+              multiple: false
+        ajustement:
+          name: "📈 Coefficient d'ajustement (%)"
+          default: 100
+          selector:
+            number:
+              min: 50
+              max: 150
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
+        verrou_defaut:
+          name: "🔒 Verrou (Sécurité PCA Obligatoire)"
+          description: >-
+            Doit pointer vers le même verrou que PCA Safety.
+            <br />👉 <strong>Entité du package :</strong> <code>input_boolean.piscine_verrou_defaut</code>
+          selector:
+            entity:
+              filter:
+                domain: input_boolean
+              multiple: false
+        fail_safe_strategy:
+          name: "🚨 Comportement en cas de Sonde d'eau HS"
+          description: "⚠️ Attention : En climat gélif, 'Marche continue 24h' est fortement recommandé pour éviter le gel en cas de sonde défaillante."
+          default: "continuous_24h"
+          selector:
+            select:
+              options:
+                - label: "Marche continue 24h (Recommandé - Sécurité eau/gel)"
+                  value: "continuous_24h"
+                - label: "Arrêt de la pompe (Priorité protection matériel)"
+                  value: "stop_pump"
+
+    # === HORAIRES ===
+    schedule_section:
+      name: "🕒 Planification des Plages"
+      icon: mdi:clock-outline
+      collapsed: false
+      input:
+        heure_demarrage_p1:
+          name: "🌙 Plage 1 : Début (Nuit)"
+          default: "22:00:00"
+          selector:
+            time: {}
+        heure_fin_hc_p1:
+          name: "🌙 Plage 1 : Fin théorique (Barrage)"
+          default: "06:00:00"
+          selector:
+            time: {}
+        ratio_p1:
+          name: "🌙 Répartition cible Plage 1 (%)"
+          default: 40
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 5
+              mode: slider
+        heure_demarrage_p2:
+          name: "☀️ Plage 2 : Début (Jour)"
+          default: "12:30:00"
+          selector:
+            time: {}
+        hivernage_full_p1:
+          name: "❄️ Hivernage : 100% sur la Plage 1"
+          default: true
+          selector:
+            boolean: {}
+
+    # === SEUILS ===
+    temperatures_section:
+      name: "🌡️ Seuils Thermiques"
+      icon: mdi:shield-sun
+      collapsed: true
+      input:
+        seuil_canicule:
+          name: "🔥 Seuil Canicule (H24)"
+          default: 28
+          selector:
+            number:
+              min: 26
+              max: 32
+              step: 0.5
+              unit_of_measurement: "°C"
+        temp_passage_hiver:
+          name: "🍂 Température charnière Hivernage (Mode Auto)"
+          description: "Passe en hiver sous Seuil-1°C et revient en été au-dessus de Seuil+1°C."
+          default: 15
+          selector:
+            number:
+              min: 5
+              max: 20
+              step: 1
+              unit_of_measurement: "°C"
+        seuil_hors_gel_eau:
+          name: "❄️ Seuil Hors-gel Eau"
+          default: 1
+          selector:
+            number:
+              min: -5
+              max: 5
+              step: 0.5
+              unit_of_measurement: "°C"
+        seuil_hors_gel_air:
+          name: "❄️ Seuil Hors-gel Air"
+          default: 1
+          selector:
+            number:
+              min: -5
+              max: 5
+              step: 0.5
+              unit_of_measurement: "°C"
+
+    # === MÉMOIRES ET STOCKAGE ===
+    storage_section:
+      name: "💾 Entités Mémoire & Stockage"
+      icon: mdi:database
+      collapsed: false
+      input:
+        fin_filtration_stockage:
+          name: "📅 Heure de Fin Prévue"
+          description: "👉 <strong>Entité du package :</strong> <code>input_datetime.piscine_fin_filtration</code>"
+          selector:
+            entity:
+              filter:
+                domain: input_datetime
+              multiple: false
+        duree_filtration_stockage:
+          name: "📊 Durée Totale Calculée"
+          description: "👉 <strong>Entité du package :</strong> <code>input_number.piscine_duree_calculee</code>"
+          selector:
+            entity:
+              filter:
+                domain: input_number
+              multiple: false
+        mem_canicule:
+          name: "🧠 Mémoire Canicule"
+          description: "👉 <strong>Entité du package :</strong> <code>input_boolean.piscine_mem_canicule</code>"
+          selector:
+            entity:
+              filter:
+                domain: input_boolean
+              multiple: false
+        mem_gel:
+          name: "🧠 Mémoire Gel"
+          description: "👉 <strong>Entité du package :</strong> <code>input_boolean.piscine_mem_gel</code>"
+          selector:
+            entity:
+              filter:
+                domain: input_boolean
+              multiple: false
+        mem_hivernage:
+          name: "🧠 Mémoire Saison Hivernage"
+          description: "👉 <strong>Entité du package :</strong> <code>input_boolean.piscine_mem_hivernage</code>"
+          selector:
+            entity:
+              filter:
+                domain: input_boolean
+              multiple: false
+        bouton_reset:
+          name: "🔄 Bouton Recalculer"
+          description: "👉 <strong>Entité du package :</strong> <code>input_button.piscine_recalculer</code>"
+          selector:
+            entity:
+              filter:
+                domain: input_button
+              multiple: false
+
+    # === NOTIFICATIONS ===
+    actions_section:
+      name: "🔔 Actions de Notification (Optionnel)"
+      icon: mdi:bell-ring
+      collapsed: true
+      input:
+        probe_failure_action:
+          name: "⚠️ Action sur Panne Sonde d'eau (1x/h max)"
+          default: []
+          selector:
+            action: {}
+        frost_blocked_action:
+          name: "❄️ Action sur Menace Gel avec Pompe Bloquée (1x/h max)"
+          default: []
+          selector:
+            action: {}
+
+mode: restart
+
+trigger_variables:
+  var_temp_air: !input temperature_air
+  var_seuil_air: !input seuil_hors_gel_air
+
+triggers:
+  - trigger: time
+    at: !input heure_demarrage_p1
+  - trigger: time
+    at: !input heure_demarrage_p2
+  - trigger: time
+    at: !input fin_filtration_stockage
+  - trigger: time_pattern
+    minutes: "/10"
+    id: "periodic"
+  - trigger: state
+    entity_id: !input switch_pompe
+    to: ["on", "off"]
+  - trigger: state
+    entity_id: !input bouton_reset
+    id: "btn_recalcul"
+  - trigger: state
+    entity_id: !input mode_filtration
+    id: "mode_change"
+  - trigger: state
+    entity_id: !input verrou_defaut
+    to: ["on", "off"]
+  - trigger: state
+    entity_id: !input temperature_piscine
+  - trigger: template
+    value_template: >-
+      {% if var_temp_air | length > 0 and states(var_temp_air) not in ['unknown', 'unavailable'] %}
+        {% set air_clean = states(var_temp_air) | string | replace('°C', '') | replace('C', '') | replace('°', '') | replace(',', '.') | trim %}
+        {{ (air_clean | float(99)) <= (var_seuil_air | float(1) + 0.5) }}
+      {% else %}
+        false
+      {% endif %}
+    id: "temp_air_trigger"
+  - trigger: state
+    entity_id:
+      - !input mem_canicule
+      - !input mem_gel
+      - !input mem_hivernage
+    to: ["on", "off"]
+
+variables:
+  # 1. Déclarations des entités
+  temp_piscine: !input temperature_piscine
+  temp_air: !input temperature_air
+  mode_filtr: !input mode_filtration
+  coef_raw: !input ajustement
+  fin_ent: !input fin_filtration_stockage
+  duree_ent: !input duree_filtration_stockage
+  verrou_ent: !input verrou_defaut
+  pompe_ent: !input switch_pompe
+  mem_canicule: !input mem_canicule
+  mem_gel: !input mem_gel
+  mem_hiver: !input mem_hivernage
+  features: !input features_enabled
+  fs_strategy: !input fail_safe_strategy
+
+  # 2. Paramètres
+  t_canicule: !input seuil_canicule
+  t_passage_hiver: !input temp_passage_hiver
+  shg_eau: !input seuil_hors_gel_eau
+  shg_air: !input seuil_hors_gel_air
+  h_p1_s: !input heure_demarrage_p1
+  h_p1_e: !input heure_fin_hc_p1
+  h_p2_s: !input heure_demarrage_p2
+  ratio_1: !input ratio_p1
+  hiv_full_1: !input hivernage_full_p1
+
+  # 3. Horodatages de base purs
+  now_ts: "{{ as_timestamp(now()) | float }}"
+  s1_t: "{{ as_timestamp(today_at(h_p1_s)) | float }}"
+  e1_t: "{{ as_timestamp(today_at(h_p1_e)) | float }}"
+  s2_t: "{{ as_timestamp(today_at(h_p2_s)) | float }}"
+  is_p1_active: "{{ h_p1_s != h_p1_e }}"
+
+  # 4. Ancrages temporels (déclarés dans l'ordre strict)
+  base_s1: >-
+    {% set s = today_at(h_p1_s) %}
+    {{ (s if now() >= s else s - timedelta(days=1)) | as_timestamp | float }}
+
+  next_s1: >-
+    {% set s = today_at(h_p1_s) %}
+    {% set s_recent = s if now() >= s else s - timedelta(days=1) %}
+    {{ (s_recent + timedelta(days=1)) | as_timestamp | float }}
+
+  base_e1_final: >-
+    {% if is_p1_active | bool %}
+      {% set s = today_at(h_p1_s) %}
+      {% set s_recent = s if now() >= s else s - timedelta(days=1) %}
+      {% set e = today_at(h_p1_e) %}
+      {% set e = e if e > s_recent else e + timedelta(days=1) %}
+      {{ e | as_timestamp | float }}
+    {% else %}
+      {% set s = today_at(h_p1_s) %}
+      {{ (s if now() >= s else s - timedelta(days=1)) | as_timestamp | float }}
+    {% endif %}
+
+  base_s2: >-
+    {% set s = today_at(h_p1_s) %}
+    {% set s_recent = s if now() >= s else s - timedelta(days=1) %}
+    {% set s2 = today_at(h_p2_s) %}
+    {% set s2 = s2 if s2 >= s_recent else s2 + timedelta(days=1) %}
+    {{ s2 | as_timestamp | float }}
+
+  # 5. Capacités calculées à partir des ancrages existants
+  cap_hc_nuit_h: "{{ ((base_e1_final | float) - (base_s1 | float)) / 3600.0 }}"
+  cap_jour_max_h: "{{ ((next_s1 | float) - (base_s2 | float)) / 3600.0 }}"
+  cap_nuit_max_h: "{{ ((base_s2 | float) - (base_s1 | float)) / 3600.0 }}"
+
+  # 6. Validations
+  schedule_is_valid: >-
+    {% set s1 = s1_t | float %}
+    {% set e1 = e1_t | float %}
+    {% set s2 = s2_t | float %}
+    {{ not ((is_p1_active | bool) and (((s2 - s1) % 86400) < ((e1 - s1) % 86400))) }}
+
+  valid_modes: ['Courbe', 'Hivernage', 'Automatique', 'Forcé', 'Inactif']
+  mode_raw: "{{ states(mode_filtr) }}"
+  mode_val: "{{ mode_raw if mode_raw in valid_modes else 'Automatique' }}"
+  
+  pump_is_on: "{{ is_state(pompe_ent, 'on') }}"
+  is_locked: "{{ is_state(verrou_ent, 'on') }}"
+  pump_blocked: "{{ (is_locked | bool) or mode_val == 'Inactif' }}"
+
+  # 7. Sondes
+  raw_eau_str: "{{ states(temp_piscine) | string | replace(',', '.') | replace('°C', '') | replace('C', '') | replace('°', '') | trim }}"
+  is_eau_hs: "{{ states(temp_piscine) in ['unknown', 'unavailable', 'none', ''] or (raw_eau_str | float(none) is none) }}"
+  t_eau_val: "{{ raw_eau_str | float(0.0) if not (is_eau_hs | bool) else 0.0 }}"
+
+  air_is_configured: "{{ temp_air | length > 0 }}"
+  raw_air_str: "{{ states(temp_air) | string | replace(',', '.') | replace('°C', '') | replace('C', '') | replace('°', '') | trim if (air_is_configured | bool) else 'none' }}"
+  is_air_hs: "{{ (states(temp_air) in ['unknown', 'unavailable', 'none', ''] or (raw_air_str | float(none) is none)) if (air_is_configured | bool) else true }}"
+  t_air_val: "{{ raw_air_str | float(99.0) if ((air_is_configured | bool) and not (is_air_hs | bool)) else 99.0 }}"
+
+  coef_val: "{{ coef_raw | float(100.0) }}"
+
+  # 8. Menaces et Mémoires
+  frost_threat: >-
+    {% set hg_on = ('enable_frost' in features) %}
+    {% set s_eau = shg_eau | float(1.0) %}
+    {% set s_air = shg_air | float(1.0) %}
+    {% set gel_eau = (not (is_eau_hs | bool)) and ((t_eau_val | float) <= s_eau) %}
+    {% set gel_air = (air_is_configured | bool) and (not (is_air_hs | bool)) and ((t_air_val | float) <= s_air) %}
+    {{ hg_on and (gel_eau or gel_air) }}
+
+  is_frost: "{{ ('enable_frost' in features) and is_state(mem_gel, 'on') and not (pump_blocked | bool) }}"
+  is_canicule: "{{ ('enable_heatwave' in features) and is_state(mem_canicule, 'on') and not (pump_blocked | bool) }}"
+  is_winter_mode: "{{ mode_val == 'Hivernage' or (mode_val == 'Automatique' and is_state(mem_hiver, 'on')) }}"
+
+  # 9. Durée totale calculée
+  duree_totale_h: >-
+    {% if mode_val == 'Inactif' %}
+      0.0
+    {% elif mode_val == 'Forcé' or (is_frost | bool) or (is_canicule | bool) %}
+      24.0
+    {% elif is_eau_hs | bool %}
+      {{ 24.0 if fs_strategy == 'continuous_24h' else 0.0 }}
+    {% elif is_winter_mode | bool %}
+      {% set base = 3.0 if (t_eau_val | float) < 10.0 else ((t_eau_val | float) / 3.0) %}
+      {{ [[base * ((coef_val | float) / 100.0), 0.0] | max, 24.0] | min | round(2) }}
+    {% else %}
+      {% set temp = [(t_eau_val | float), 10.0] | max %}
+      {% set a = 0.00335 * (coef_val | float) / 100.0 %}
+      {% set b = -0.14953 * (coef_val | float) / 100.0 %}
+      {% set c = 2.43489 * (coef_val | float) / 100.0 %}
+      {% set d = -10.72859 * (coef_val | float) / 100.0 %}
+      {% set h = (a * temp**3) + (b * temp**2) + (c * temp) + d %}
+      {{ [[h, 0.0] | max, 24.0] | min | round(2) }}
+    {% endif %}
+
+  # 10. Répartition en secondes
+  d1_sec: >-
+    {% set tot_h = duree_totale_h | float(0.0) %}
+    {% set cap_j = cap_jour_max_h | float(0.0) %}
+    {% set cap_n = cap_nuit_max_h | float(0.0) %}
+    {% set cap_hc = cap_hc_nuit_h | float(0.0) %}
+    {% if not (is_p1_active | bool) %}
+      0
+    {% elif (is_winter_mode | bool) and hiv_full_1 %}
+      {{ (tot_h * 3600) | int }}
+    {% else %}
+      {% set p1_base = [tot_h * ((ratio_1 | float(40.0)) / 100.0), cap_hc] | min %}
+      {% set p2_target = tot_h - p1_base %}
+      {% if p2_target > cap_j %}
+        {% set p1_final = [tot_h - cap_j, cap_n] | min %}
+        {{ ((p1_final * 60) | int) * 60 }}
+      {% else %}
+        {{ ((p1_base * 60) | int) * 60 }}
+      {% endif %}
+    {% endif %}
+
+  d2_sec: >-
+    {% set tot_h = duree_totale_h | float(0.0) %}
+    {% set cap_j = cap_jour_max_h | float(0.0) %}
+    {% set cap_n = cap_nuit_max_h | float(0.0) %}
+    {% set cap_hc = cap_hc_nuit_h | float(0.0) %}
+    {% if (is_winter_mode | bool) and hiv_full_1 %}
+      0
+    {% elif not (is_p1_active | bool) %}
+      {{ (([tot_h, cap_j] | min * 60) | int) * 60 }}
+    {% else %}
+      {% set p1_base = [tot_h * ((ratio_1 | float(40.0)) / 100.0), cap_hc] | min %}
+      {% set p2_target = tot_h - p1_base %}
+      {% if p2_target > cap_j %}
+        {{ ((cap_j * 60) | int) * 60 }}
+      {% else %}
+        {{ ((p2_target * 60) | int) * 60 }}
+      {% endif %}
+    {% endif %}
+
+  # 11. Horodatages de fin et décision
+  end_p1_ts: "{{ (base_s1 | float) + (d1_sec | float) }}"
+  in_window_1: "{{ (d1_sec | int > 0) and ((base_s1 | float) <= (now_ts | float) < (end_p1_ts | float)) }}"
+
+  end_p2_ts: "{{ (base_s2 | float) + (d2_sec | float) }}"
+  in_window_2: "{{ (d2_sec | int > 0) and ((base_s2 | float) <= (now_ts | float) < (end_p2_ts | float)) }}"
+
+  is_continuous: >-
+    {{ not (pump_blocked | bool) and (
+         mode_val == 'Forcé' or (is_frost | bool) or (is_canicule | bool) or 
+         ((is_eau_hs | bool) and fs_strategy == 'continuous_24h')
+       ) }}
+
+  should_pump_run: >-
+    {{ not (pump_blocked | bool) and (
+         (is_continuous | bool) or (in_window_1 | bool) or (in_window_2 | bool)
+       ) }}
+
+  # Correction de l'erreur TypeError do_max() : extraction de liste propre sans default=
+  current_target_fin_ts: >-
+    {% if pump_blocked | bool %}
+      {{ now_ts | float }}
+    {% elif is_continuous | bool %}
+      {{ (now_ts // 3600 + 24) * 3600 }}
+    {% elif (should_pump_run | bool) and (in_window_1 | bool) %}
+      {{ end_p1_ts | float }}
+    {% elif (should_pump_run | bool) and (in_window_2 | bool) %}
+      {{ end_p2_ts | float }}
+    {% else %}
+      {% set past = [end_p1_ts | float, end_p2_ts | float] | select('le', now_ts | float) | list %}
+      {{ (past | max) if past | count > 0 else (now_ts | float) }}
+    {% endif %}
+
+actions:
+  # ===========================================================================
+  # 1. MISE À JOUR DES MÉMOIRES THERMIQUES
+  # ===========================================================================
+  - if: "{{ not (is_eau_hs | bool) }}"
+    then:
+      - if: "{{ ('enable_heatwave' in features) and ((t_eau_val | float) >= (t_canicule | float)) }}"
+        then:
+          - action: input_boolean.turn_on
+            continue_on_error: true
+            target: { entity_id: !input mem_canicule }
+      - if: "{{ ('enable_heatwave' not in features) or ((t_eau_val | float) < ((t_canicule | float) - 0.5)) }}"
+        then:
+          - action: input_boolean.turn_off
+            continue_on_error: true
+            target: { entity_id: !input mem_canicule }
+
+      - if: "{{ (t_eau_val | float) <= ((t_passage_hiver | float(15.0)) - 1.0) }}"
+        then:
+          - action: input_boolean.turn_on
+            continue_on_error: true
+            target: { entity_id: !input mem_hivernage }
+      - if: "{{ (t_eau_val | float) >= ((t_passage_hiver | float(15.0)) + 1.0) }}"
+        then:
+          - action: input_boolean.turn_off
+            continue_on_error: true
+            target: { entity_id: !input mem_hivernage }
+
+  - variables:
+      want_gel: >-
+        {{ ('enable_frost' in features) and
+           ((not (is_eau_hs | bool) and (t_eau_val | float) <= (shg_eau | float(1.0))) or
+            ((air_is_configured | bool) and not (is_air_hs | bool) and (t_air_val | float) <= (shg_air | float(1.0)))) }}
+      can_cancel_gel: >-
+        {% set eau_ok = not (is_eau_hs | bool) and (t_eau_val | float) > ((shg_eau | float(1.0)) + 0.5) %}
+        {% set air_ok = (not (air_is_configured | bool)) or (not (is_air_hs | bool) and (t_air_val | float) > ((shg_air | float(1.0)) + 0.5)) %}
+        {{ ('enable_frost' not in features) or (eau_ok and air_ok) }}
+
+  - if: "{{ want_gel | bool }}"
+    then:
+      - action: input_boolean.turn_on
+        continue_on_error: true
+        target: { entity_id: !input mem_gel }
+  - if: "{{ can_cancel_gel | bool }}"
+    then:
+      - action: input_boolean.turn_off
+        continue_on_error: true
+        target: { entity_id: !input mem_gel }
+
+  # ===========================================================================
+  # 2. COMMANDE DE LA POMPE (EXÉCUTÉE EN PRIORITÉ ABSOLUE)
+  # ===========================================================================
+  - choose:
+      - conditions:
+          - "{{ (should_pump_run | bool) and not (pump_is_on | bool) }}"
+          - "{{ states(pompe_ent) not in ['unavailable', 'unknown'] }}"
+        sequence:
+          - action: homeassistant.turn_on
+            target: { entity_id: !input switch_pompe }
+      - conditions:
+          - "{{ not (should_pump_run | bool) and (pump_is_on | bool) }}"
+          - "{{ states(pompe_ent) not in ['unavailable', 'unknown'] }}"
+        sequence:
+          - action: homeassistant.turn_off
+            target: { entity_id: !input switch_pompe }
+
+  # ===========================================================================
+  # 3. NOTIFICATIONS ET ALERTES
+  # ===========================================================================
+  - if: "{{ not (schedule_is_valid | bool) }}"
+    then:
+      - action: persistent_notification.create
+        data:
+          title: "🚨 PCA : Erreur de Configuration"
+          message: "Mode invalide ou Plage 2 commençant pendant la Plage 1. Pompe mise à l'arrêt par sécurité."
+          notification_id: "pca_config_error"
+    else:
+      - action: persistent_notification.dismiss
+        data: { notification_id: "pca_config_error" }
+
+  - if: "{{ is_eau_hs | bool }}"
+    then:
+      - action: persistent_notification.create
+        data:
+          title: "⚠️ PCA : Sonde d'eau HS"
+          message: "La sonde d'eau ({{ temp_piscine }}) a renvoyé la valeur '{{ states(temp_piscine) }}'. Stratégie appliquée : {{ fs_strategy }}."
+          notification_id: "pca_sonde_hs"
+      - if:
+          - condition: trigger
+            id: "periodic"
+          - "{{ now().minute < 10 }}"
+        then:
+          - choose: []
+            default: !input probe_failure_action
+    else:
+      - action: persistent_notification.dismiss
+        data: { notification_id: "pca_sonde_hs" }
+
+  - if: "{{ (frost_threat | bool) and (pump_blocked | bool) }}"
+    then:
+      - action: persistent_notification.create
+        data:
+          title: "❄️⚠️ Gel Imminent sur Pompe Bloquée"
+          message: "Le gel menace les canalisations mais la pompe est verrouillée ou Inactive ! Intervenez."
+          notification_id: "pca_gel_verrou"
+      - if:
+          - condition: trigger
+            id: "periodic"
+          - "{{ now().minute < 10 }}"
+        then:
+          - choose: []
+            default: !input frost_blocked_action
+    else:
+      - action: persistent_notification.dismiss
+        data: { notification_id: "pca_gel_verrou" }
+
+  # ===========================================================================
+  # 4. DASHBOARD (FORÇAGE IMMÉDIAT SUR BOUTON OU CHANGEMENT DE MODE)
+  # ===========================================================================
+  - variables:
+      is_manual_event: "{{ trigger.id in ['btn_recalcul', 'mode_change'] }}"
+
+  - if: "{{ is_manual_event or (((states(duree_ent) | float(0)) - (duree_totale_h | float(0))) | abs > 0.05) }}"
+    then:
+      - action: input_number.set_value
+        continue_on_error: true
+        target: { entity_id: !input duree_filtration_stockage }
+        data: { value: "{{ duree_totale_h | float(0) }}" }
+
+  - if: "{{ is_manual_event or (((state_attr(fin_ent, 'timestamp') | float(0)) - (current_target_fin_ts | float(0))) | abs > 5) }}"
+    then:
+      - action: input_datetime.set_datetime
+        continue_on_error: true
+        target: { entity_id: !input fin_filtration_stockage }
+        data: { timestamp: "{{ current_target_fin_ts | float(0) }}" }
