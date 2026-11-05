@@ -491,7 +491,7 @@ variables:
 
   is_continuous: >-
     {{ not (pump_blocked | bool) and (
-         mode_val == 'Forcé' or (is_frost | bool) or (is_canicule | bool) or 
+         mode_val == 'Forcé' or (is_frost | bool) or (is_canicule | bool) or
          ((is_eau_hs | bool) and fs_strategy == 'continuous_24h')
        ) }}
 
