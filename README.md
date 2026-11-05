@@ -87,6 +87,10 @@ Importez les deux moteurs logiques dans votre instance Home Assistant :
 1. Allez dans `Paramètres > Automatisations et Scènes > Blueprints`.
 2. Cliquez sur **Importer un Blueprint** et collez les URLs des fichiers `pca_logic.yaml` et `pca_safety.yaml`.
 
+Ou :
+[![Importer PCA Logic dans Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FPlutonunO%2FHA_piscine%2Fblob%2Fmain%2Fconfig%2Fblueprints%2Fautomation%2Fpiscine%2Fpca_logic.yaml)
+[![Importer PCA Safety dans Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FPlutonunO%2FHA_piscine%2Fblob%2Fmain%2Fconfig%2Fblueprints%2Fautomation%2Fpiscine%2Fpca_safety.yaml)
+
 ### Étape 3 : Création des Automatisations
 1. **Optionnel** Créez une nouvelle automatisation à partir du blueprint **PCA Safety**, renseignez les capteurs physiques de votre pompe, et sauvegardez.
 2. Créez une nouvelle automatisation à partir du blueprint **PCA Logic** en associant les mêmes capteurs et les Helpers créés à l'Étape 1.
