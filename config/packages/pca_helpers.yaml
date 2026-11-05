@@ -1,0 +1,75 @@
+###############################################################################
+# PACKAGE : POOL CONTROL AUTOMATION (PCA) - v2026.1
+###############################################################################
+
+input_select:
+  piscine_mode:
+    name: "Mode Piscine"
+    icon: mdi:pool
+    options:
+      - "Courbe"
+      - "Hivernage"
+      - "Automatique"
+      - "Forcé"
+      - "Inactif"
+
+input_datetime:
+  piscine_fin_filtration:
+    name: "Fin de filtration prévue"
+    icon: mdi:clock-end
+    has_date: true
+    has_time: true
+
+input_number:
+  piscine_duree_calculee:
+    name: "Durée filtration théorique 24h"
+    icon: mdi:timer-sand
+    min: 0
+    max: 24
+    step: 0.01
+    unit_of_measurement: "h"
+
+input_boolean:
+  piscine_verrou_defaut:
+    name: "🚨 Verrou Défaut Pompe"
+    icon: mdi:alert-octagon
+
+  piscine_mem_canicule:
+    name: "Mémoire Canicule"
+  piscine_mem_gel:
+    name: "Mémoire Gel"
+  piscine_mem_hivernage:
+    name: "Mémoire Saison Hiver"
+
+input_button:
+  piscine_recalculer:
+    name: "Recalculer la filtration"
+    icon: mdi:refresh
+
+template:
+  - sensor:
+      - name: "Piscine Statut Filtration"
+        unique_id: piscine_statut_filtration
+        icon: mdi:pool
+        # IMPORTANT : REMPLACEZ 'switch.VOTRE_POMPE_ICI' CI-DESSOUS PAR VOTRE ENTITÉ RÉELLE DE POMPE
+        state: >-
+          {% if is_state('input_boolean.piscine_verrou_defaut', 'on') %}
+            🚨 Défaut pompe (Verrouillé)
+          {% elif is_state('input_select.piscine_mode', 'Inactif') %}
+            Inactif
+          {% elif is_state('input_select.piscine_mode', 'Forcé') %}
+            Forcé (Marche continue)
+          {% elif is_state('input_boolean.piscine_mem_gel', 'on') %}
+            Hors-gel actif
+          {% elif is_state('input_boolean.piscine_mem_canicule', 'on') %}
+            Canicule active
+          {% elif is_state('switch.shelly1g4_pompe_piscine_switch_0', 'on') %}
+            {% set fin_ts = state_attr('input_datetime.piscine_fin_filtration', 'timestamp') | float(0) %}
+            {% if fin_ts > as_timestamp(now()) %}
+              En filtration (Fin à {{ fin_ts | timestamp_custom('%H:%M', true) }})
+            {% else %}
+              En filtration (Manuelle)
+            {% endif %}
+          {% else %}
+            En pause
+          {% endif %}
