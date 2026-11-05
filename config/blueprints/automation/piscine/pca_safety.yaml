@@ -1,0 +1,412 @@
+blueprint:
+  name: "🛡️ PCA Safety - Garde du corps électrique"
+  description: |
+    # 🛡️ PCA Safety v2026.1
+    Surveille l'alimentation électrique de la pompe. Coupe directement la pompe et verrouille le système
+    en cas de désamorçage, de marche à sec, de perte de communication ou d'unité inconnue.
+
+    ### 📦 Entité du package associée :
+    * **Verrou** : `input_boolean.piscine_verrou_defaut`
+
+    ### ⚠️ Avertissement de sécurité matérielle :
+    * La détection de relais collé est une **sécurité logicielle d'alerte** basée sur la consommation résiduelle. Elle intervient après un délai d'attente réseau configurable (de 10 à 120 s, 30 s par défaut).
+    * **Elle ne remplace en aucun cas les protections physiques obligatoires** : un disjoncteur magnéto-thermique moteur bien calibré et un contacteur de puissance restent indispensables.
+
+  author: "Plutonun"
+  domain: automation
+  homeassistant:
+    min_version: "2024.10.0"
+
+  input:
+    switch_pompe:
+      name: "🔌 Pompe de filtration"
+      description: >-
+        Entité commandant la pompe (switch, contacteur ou relais).
+        <br />💡 <em>Exemple : <code>switch.pompe_piscine</code></em>
+      selector:
+        entity:
+          filter:
+            domain: [switch, light, input_boolean]
+          multiple: false
+    power_sensor:
+      name: "⚡ Capteur de puissance"
+      description: >-
+        Capteur mesurant la consommation active en Watts.
+        <br />💡 <em>Exemple : <code>sensor.pompe_piscine_puissance</code></em>
+      selector:
+        entity:
+          filter:
+            domain: sensor
+            device_class: power
+          multiple: false
+    verrou_defaut:
+      name: "🔒 Entité de Verrouillage (Obligatoire)"
+      description: >-
+        Interrupteur de verrouillage persistant en cas d'anomalie.
+        <br />👉 <strong>Entité du package :</strong> <code>input_boolean.piscine_verrou_defaut</code>
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
+          multiple: false
+    min_power_threshold:
+      name: "📉 Seuil de puissance minimale (Watts)"
+      description: "En dessous de cette valeur en marche, la pompe est considérée comme désamorcée."
+      default: 500
+      selector:
+        number:
+          min: 50
+          max: 3000
+          step: 10
+          unit_of_measurement: "W"
+          mode: box
+    dry_run_delay:
+      name: "⏱️ Délai de confirmation d'amorçage (s)"
+      description: "Temps sous le seuil avant coupure. Si votre capteur n'actualise sa puissance que toutes les 30s ou 60s, augmentez ce délai (ex: 180s) pour éviter les faux positifs."
+      default: 120
+      selector:
+        number:
+          min: 30
+          max: 600
+          step: 10
+          unit_of_measurement: "s"
+          mode: slider
+
+    stuck_relay_threshold:
+      name: "📉 Seuil de détection relais collé (Watts)"
+      description: "Si la pompe consomme encore plus que cette puissance après l'ordre d'arrêt, le contacteur physique est considéré comme soudé/collé."
+      default: 50
+      selector:
+        number:
+          min: 10
+          max: 500
+          step: 5
+          unit_of_measurement: "W"
+          mode: box
+
+    stuck_relay_timeout:
+      name: "⏱️ Délai de confirmation d'extinction (s)"
+      description: "Temps accordé au réseau pour remonter la chute de puissance avant d'analyser si le relais est collé."
+      default: 30
+      selector:
+        number:
+          min: 10
+          max: 120
+          step: 5
+          unit_of_measurement: "s"
+          mode: slider
+
+    actions_section:
+      name: "🔔 Actions d'alerte (Optionnel)"
+      icon: mdi:bell-ring
+      collapsed: true
+      input:
+        dry_run_action:
+          name: "🚨 Action sur Marche à sec"
+          default: []
+          selector:
+            action: {}
+        stuck_relay_action:
+          name: "🔥 Action sur Relais Collé"
+          default: []
+          selector:
+            action: {}
+        relay_loss_action:
+          name: "⚠️ Action sur Relais Injoignable"
+          default: []
+          selector:
+            action: {}
+
+mode: parallel
+max: 10
+max_exceeded: warning
+
+trigger_variables:
+  var_power: !input power_sensor
+  var_pump: !input switch_pompe
+  var_seuil: !input min_power_threshold
+
+triggers:
+  # 1. Alerte Marche à sec
+  - trigger: template
+    value_template: >-
+      {% set p_state = states(var_power) %}
+      {% if is_state(var_pump, 'on') and is_number(p_state) %}
+        {% set p_val = p_state | float(0) %}
+        {% set uom = state_attr(var_power, 'unit_of_measurement') | string | lower | trim %}
+        {% set actual_power = (p_val * 1000) if ('kw' in uom or 'kva' in uom) else p_val %}
+        {{ actual_power < var_seuil | float(0) }}
+      {% else %}
+        false
+      {% endif %}
+    for:
+      seconds: !input dry_run_delay
+    id: "dry_run"
+
+  # 2. Perte de supervision de puissance (2 minutes de grâce)
+  - trigger: state
+    entity_id: !input power_sensor
+    to: ["unavailable", "unknown"]
+    for:
+      minutes: 2
+    id: "loss_power_sensor"
+
+  # 3. Retour de supervision de puissance (strict)
+  - trigger: state
+    entity_id: !input power_sensor
+    from: ["unavailable", "unknown"]
+    not_to: ["unavailable", "unknown"]
+    id: "restored_power_sensor"
+
+  # 4. Démarrage de la pompe (surveillance démarrage aveugle)
+  - trigger: state
+    entity_id: !input switch_pompe
+    to: "on"
+    id: "pump_turned_on"
+
+  # 5. Perte de communication avec le relais
+  - trigger: state
+    entity_id: !input switch_pompe
+    to: ["unavailable", "unknown"]
+    id: "loss_relay"
+
+  # 6. Retour du relais
+  - trigger: state
+    entity_id: !input switch_pompe
+    from: ["unavailable", "unknown"]
+    not_to: ["unavailable", "unknown"]
+    id: "restored_relay"
+
+  # 7. Démarrage Home Assistant
+  - trigger: homeassistant
+    event: start
+    id: "ha_start"
+
+  # 8. Déverrouillage manuel (Acquittement global de toutes les alertes)
+  - trigger: state
+    entity_id: !input verrou_defaut
+    to: "off"
+    id: "unlock_trigger"
+
+variables:
+  verrou_ent: !input verrou_defaut
+  pompe_ent: !input switch_pompe
+  power_ent: !input power_sensor
+  seuil_relais_w: !input stuck_relay_threshold
+  timeout_relais_s: !input stuck_relay_timeout
+  uom: "{{ state_attr(power_ent, 'unit_of_measurement') | string | lower | trim }}"
+  is_uom_valid: "{{ uom in ['w', 'kw', 'va', 'kva'] }}"
+
+actions:
+  - choose:
+      # --- ACQUITTEMENT DU VERROU (Fermeture de toutes les alertes) ---
+      - conditions:
+          - condition: trigger
+            id: "unlock_trigger"
+        sequence:
+          - action: persistent_notification.dismiss
+            data: { notification_id: "pca_dry_run" }
+          - action: persistent_notification.dismiss
+            data: { notification_id: "pca_stuck_relay" }
+          - action: persistent_notification.dismiss
+            data: { notification_id: "pca_power_loss" }
+          - action: persistent_notification.dismiss
+            data: { notification_id: "pca_power_uom_error" }
+          - action: persistent_notification.dismiss
+            data: { notification_id: "pca_relay_loss" }
+
+      # --- DÉMARRAGE HOME ASSISTANT : DÉLAI DE GRÂCE ---
+      - conditions:
+          - condition: trigger
+            id: "ha_start"
+        sequence:
+          - wait_template: "{{ states(power_ent) not in ['unavailable', 'unknown'] }}"
+            timeout: 120
+            continue_on_timeout: true
+          - if:
+              - "{{ states(power_ent) in ['unavailable', 'unknown'] and is_state(pompe_ent, 'on') }}"
+            then:
+              - action: input_boolean.turn_on
+                continue_on_error: true
+                target: { entity_id: "{{ verrou_ent }}" }
+              - action: homeassistant.turn_off
+                continue_on_error: true
+                target: { entity_id: "{{ pompe_ent }}" }
+              - action: persistent_notification.create
+                data:
+                  title: "⚠️ PCA Safety : Boot Aveugle"
+                  message: "Démarrage HA : Capteur de puissance introuvable alors que la pompe tournait. Arrêt de précaution."
+                  notification_id: "pca_power_loss"
+              - wait_template: "{{ is_state(pompe_ent, 'off') }}"
+                timeout: 15
+                continue_on_timeout: true
+              - if:
+                  - "{{ is_state(pompe_ent, 'on') }}"
+                then:
+                  - action: persistent_notification.create
+                    data:
+                      title: "🔥 DANGER : RELAIS POMPE COLLÉ !"
+                      message: "Démarrage HA : La pompe refuse de s'éteindre lors de la coupure de sécurité ! Coupez le disjoncteur."
+                      notification_id: "pca_stuck_relay"
+                  - choose: []
+                    default: !input stuck_relay_action
+
+      # --- MARCHE À SEC DÉTECTÉE ---
+      - conditions:
+          - condition: trigger
+            id: "dry_run"
+        sequence:
+          - if:
+              - "{{ not is_uom_valid }}"
+            then:
+              - action: input_boolean.turn_on
+                continue_on_error: true
+                target: { entity_id: "{{ verrou_ent }}" }
+              - action: homeassistant.turn_off
+                continue_on_error: true
+                target: { entity_id: "{{ pompe_ent }}" }
+              - action: persistent_notification.create
+                data:
+                  title: "🚨 PCA Safety : Erreur Unité"
+                  message: "Unité de mesure inconnue ({{ uom }}). Pompe coupée et verrouillée par précaution."
+                  notification_id: "pca_power_uom_error"
+              - stop: "Unité invalide."
+
+          # 1. VERROU D'ABORD (interdit tout redémarrage concurrent)
+          - action: input_boolean.turn_on
+            continue_on_error: true
+            target: { entity_id: "{{ verrou_ent }}" }
+          # 2. COUPURE MATÉRIELLE
+          - action: homeassistant.turn_off
+            continue_on_error: true
+            target: { entity_id: "{{ pompe_ent }}" }
+          # 3. Notification persistante HA
+          - action: persistent_notification.create
+            data:
+              title: "🚨 ARRÊT D'URGENCE PISCINE"
+              message: "Marche à sec ou désamorçage détecté ! Pompe arrêtée et verrouillée."
+              notification_id: "pca_dry_run"
+          # 4. Action utilisateur et vérification intelligente en parallèle
+          - parallel:
+              - choose: []
+                default: !input dry_run_action
+              - sequence:
+                  - wait_template: "{{ is_state(pompe_ent, 'off') }}"
+                    timeout: 15
+                    continue_on_timeout: true
+                  - if:
+                      - "{{ is_state(pompe_ent, 'on') }}"
+                    then:
+                      - action: persistent_notification.create
+                        data:
+                          title: "🔥 DANGER : RELAIS POMPE COLLÉ !"
+                          message: "La pompe a reçu l'ordre d'arrêt mais est toujours active après 15s ! Coupez le disjoncteur physique immédiatement."
+                          notification_id: "pca_stuck_relay"
+                      - choose: []
+                        default: !input stuck_relay_action
+
+      # --- DÉMARRAGE AVEUGLE (POMPE ON MAIS CAPTEUR INCONNU) ---
+      - conditions:
+          - condition: trigger
+            id: "pump_turned_on"
+          - "{{ states(power_ent) in ['unavailable', 'unknown'] }}"
+        sequence:
+          - wait_template: "{{ states(power_ent) not in ['unavailable', 'unknown'] }}"
+            timeout: 120
+            continue_on_timeout: true
+          - if:
+              - "{{ states(power_ent) in ['unavailable', 'unknown'] and is_state(pompe_ent, 'on') }}"
+            then:
+              - action: input_boolean.turn_on
+                continue_on_error: true
+                target: { entity_id: "{{ verrou_ent }}" }
+              - action: homeassistant.turn_off
+                continue_on_error: true
+                target: { entity_id: "{{ pompe_ent }}" }
+              - action: persistent_notification.create
+                data:
+                  title: "⚠️ PCA Safety : Démarrage Aveugle Interdit"
+                  message: "La pompe fonctionne alors que la puissance reste injoignable après 120s. Arrêt et verrouillage immédiats."
+                  notification_id: "pca_power_loss"
+              - wait_template: "{{ is_state(pompe_ent, 'off') }}"
+                timeout: 15
+                continue_on_timeout: true
+              - if:
+                  - "{{ is_state(pompe_ent, 'on') }}"
+                then:
+                  - action: persistent_notification.create
+                    data:
+                      title: "🔥 DANGER : RELAIS POMPE COLLÉ !"
+                      message: "La pompe refuse de s'éteindre lors de la mise en sécurité après 15s ! Coupez le disjoncteur."
+                      notification_id: "pca_stuck_relay"
+                  - choose: []
+                    default: !input stuck_relay_action
+
+      # --- PERTE DU CAPTEUR DE PUISSANCE HORS DÉMARRAGE ---
+      - conditions:
+          - condition: trigger
+            id: "loss_power_sensor"
+        sequence:
+          - if:
+              - "{{ is_state(pompe_ent, 'on') }}"
+            then:
+              - action: input_boolean.turn_on
+                continue_on_error: true
+                target: { entity_id: "{{ verrou_ent }}" }
+              - action: homeassistant.turn_off
+                continue_on_error: true
+                target: { entity_id: "{{ pompe_ent }}" }
+              - action: persistent_notification.create
+                data:
+                  title: "⚠️ PCA Safety Aveugle"
+                  message: "Le capteur de puissance est indisponible alors que la pompe tournait. Arrêt et verrouillage par précaution."
+                  notification_id: "pca_power_loss"
+              - wait_template: "{{ is_state(pompe_ent, 'off') }}"
+                timeout: 15
+                continue_on_timeout: true
+              - if:
+                  - "{{ is_state(pompe_ent, 'on') }}"
+                then:
+                  - action: persistent_notification.create
+                    data:
+                      title: "🔥 DANGER : RELAIS POMPE COLLÉ !"
+                      message: "La pompe refuse de s'éteindre lors de la mise en sécurité après 15s ! Coupez le disjoncteur."
+                      notification_id: "pca_stuck_relay"
+                  - choose: []
+                    default: !input stuck_relay_action
+            else:
+              - action: persistent_notification.create
+                data:
+                  title: "⚠️ PCA Safety : Supervision Perdue"
+                  message: "Capteur de puissance indisponible. Démarrage déconseillé."
+                  notification_id: "pca_power_loss"
+
+      # --- RETOUR DU CAPTEUR DE PUISSANCE ---
+      - conditions:
+          - condition: trigger
+            id: "restored_power_sensor"
+          - "{{ is_number(states(power_ent)) }}"
+        sequence:
+          - action: persistent_notification.dismiss
+            data: { notification_id: "pca_power_loss" }
+
+      # --- PERTE DU RELAIS ---
+      - conditions:
+          - condition: trigger
+            id: "loss_relay"
+        sequence:
+          - action: persistent_notification.create
+            data:
+              title: "⚠️ PCA Safety : Relais Injoignable"
+              message: "La communication avec le relais de la pompe est rompue."
+              notification_id: "pca_relay_loss"
+          - choose: []
+            default: !input relay_loss_action
+
+      # --- RETOUR DU RELAIS ---
+      - conditions:
+          - condition: trigger
+            id: "restored_relay"
+        sequence:
+          - action: persistent_notification.dismiss
+            data: { notification_id: "pca_relay_loss" }
