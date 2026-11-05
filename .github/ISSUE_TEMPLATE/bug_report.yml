@@ -1,0 +1,43 @@
+name: 🐛 Rapport de bug
+description: Signaler un dysfonctionnement du moteur PCA ou du module Safety.
+title: "[BUG]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de signaler un dysfonctionnement. Avant de valider, vérifiez que le problème n'a pas déjà été signalé dans la liste des tickets ou résolu dans les traces d'automatisation.
+  - type: input
+    id: ha_version
+    attributes:
+      label: Version de Home Assistant Core
+      description: Indiquez votre version exacte (ex: 2026.3.2).
+      placeholder: 2026.x.x
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Composant concerné
+      options:
+        - PCA Logic (pca_logic.yaml)
+        - PCA Safety (pca_safety.yaml)
+        - Package Helpers (pca_helpers.yaml)
+        - Tableau de bord (lovelace.yaml)
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Description du problème
+      description: Expliquez clairement ce qui s'est passé et le comportement attendu.
+    validations:
+      required: true
+  - type: textarea
+    id: trace
+    attributes:
+      label: Traces d'automatisation ou logs
+      description: Copiez-collez ici le YAML de la trace de l'automatisation ou les journaux système.
+      render: yaml
+    validations:
+      required: false
