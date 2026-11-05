@@ -40,7 +40,12 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
+      - name: Génération de la configuration HA minimale
+        run: |
+          echo "default_config:" > config/configuration.yaml
+          echo "homeassistant: { packages: !include_dir_named packages }" >> config/configuration.yaml
+
       - name: Vérification de la configuration HA
         uses: frenck/action-home-assistant@v1
         with:
-          path: "config/blueprints"
+          path: "config"
