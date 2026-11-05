@@ -45,31 +45,41 @@ Pour tirer pleinement parti de PCA, votre installation Home Assistant doit remon
 
 ## 🚀 Installation
 
-### Étape 1 : Création des Helpers (Entités mémoires)
-Le fonctionnement sans état nécessite quelques `Helpers` (Entrées) dans Home Assistant pour stocker les variables physiques.
-Créez les entités suivantes depuis `Paramètres > Appareils et services > Entrées` :
+Pour fonctionner grâce à son architecture sans état, PCA a besoin de stocker ses variables physiques dans quelques entités mémoires (Helpers). Pour vous simplifier la vie, vous pouvez toutes les créer d'un seul coup.
 
-*   **Interrupteurs booléens (`input_boolean`) :**
-    *   `input_boolean.piscine_verrou_defaut` (Partagé entre Logic et Safety)
-    *   `input_boolean.piscine_mem_canicule`
-    *   `input_boolean.piscine_mem_gel`
-    *   `input_boolean.piscine_mem_hivernage`
-*   **Liste déroulante (`input_select`) :**
-    *   `input_select.piscine_mode` (Options : *Courbe, Hivernage, Automatique, Forcé, Inactif*)
-*   **Nombre (`input_number`) :**
-    *   `input_number.piscine_duree_calculee` (Min: 0, Max: 24, Pas: 0.1)
-*   **Date et Heure (`input_datetime`) :**
-    *   `input_datetime.piscine_fin_filtration` (Mode: Date et Heure)
-*   **Bouton (`input_button`) :**
-    *   `input_button.piscine_recalculer`
+### Étape 1 : Création des Entités Mémoires (Helpers)
+
+**🌟 Méthode Recommandée (Automatique via Package YAML) :**
+C'est la méthode la plus propre et la plus rapide.
+1. Depuis Home Assistant (via *File Editor* ou *Studio Code Server*), ouvrez votre fichier `configuration.yaml` et ajoutez ces lignes pour activer le système de packages :
+   ```yaml
+   homeassistant:
+     packages: !include_dir_named packages
+   ```
+2. Créez un dossier nommé `packages` à la racine de votre configuration (au même niveau que `configuration.yaml`).
+3. Dans ce nouveau dossier, créez un fichier nommé `pca_helpers.yaml` et collez-y l'intégralité du code fourni dans le dossier `packages/` de ce dépôt.
+4. Redémarrez Home Assistant (`Outils de développement > Redémarrer`). Vos 8 entités sont créées !
+
+<details>
+<summary><b>🔧 Méthode Alternative (Manuelle via l'interface)</b></summary>
+Si vous ne souhaitez pas utiliser le YAML, vous pouvez créer ces 8 entités manuellement depuis `Paramètres > Appareils et services > Entrées` :
+- <b>4x Interrupteurs booléens</b> : piscine_verrou_defaut, piscine_mem_canicule, piscine_mem_gel, piscine_mem_hivernage
+- <b>1x Liste déroulante</b> : piscine_mode (Options : Courbe, Hivernage, Automatique, Forcé, Inactif)
+- <b>1x Nombre</b> : piscine_duree_calculee (Min:0, Max:24, Pas:0.1)
+- <b>1x Date et/ou Heure</b> : piscine_fin_filtration (Activer Date ET Heure)
+- <b>1x Bouton</b> : piscine_recalculer
+</details>
 
 ### Étape 2 : Importation des Blueprints
-Importez les deux Blueprints depuis ce dépôt GitHub vers votre instance Home Assistant :
+Importez les deux moteurs logiques dans votre instance Home Assistant :
 1. Allez dans `Paramètres > Automatisations et Scènes > Blueprints`.
-2. Importez `pca_logic.yaml` et `pca_safety.yaml`.
+2. Cliquez sur **Importer un Blueprint** et collez les URLs des fichiers `pca_logic.yaml` et `pca_safety.yaml`.
 
-### Étape 3 : Création des automatisations
-Créez une automatisation pour **PCA Logic** et une pour **PCA Safety** en associant vos capteurs physiques et les Helpers créés à l'Étape 1.
+### Étape 3 : Création des Automatisations
+1. Créez une nouvelle automatisation à partir du blueprint **PCA Safety**, renseignez les capteurs physiques de votre pompe, et sauvegardez.
+2. Créez une nouvelle automatisation à partir du blueprint **PCA Logic** en associant les mêmes capteurs et les Helpers créés à l'Étape 1.
+
+🎉 **C'est terminé ! Votre filtration est maintenant pilotée par le moteur PCA.**
 
 ---
 
@@ -83,6 +93,3 @@ Le code pour un tableau de bord optimal, utilisant la technique de la *divulgati
 
 Ce projet est sous licence **Apache License 2.0**.
 Vous êtes libre de l'utiliser, de le modifier et de le distribuer, sous réserve d'en mentionner la provenance technique. Consultez le fichier `LICENSE` pour plus de détails.
-
----
-*Si ce projet vous a aidé à sécuriser votre bassin et optimiser votre facture d'électricité, n'hésitez pas à laisser une étoile ⭐ sur le dépôt !*
