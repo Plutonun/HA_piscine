@@ -57,7 +57,7 @@ C'est la méthode la plus propre et la plus rapide.
      packages: !include_dir_named packages
    ```
 2. Créez un dossier nommé `packages` à la racine de votre configuration (au même niveau que `configuration.yaml`).
-3. Dans ce nouveau dossier, créez un fichier nommé `pca_helpers.yaml` et collez-y l'intégralité du code fourni dans le dossier `packages/` de ce dépôt.
+3. Dans ce nouveau dossier, créez un fichier nommé `pca_helpers.yaml` et collez-y l'intégralité du code fourni dans le dossier `config/packages/` de ce dépôt.
 4. Modifier le switch pour votre pompe
 5. Redémarrez Home Assistant (`Outils de développement > Redémarrer`). Vos 8 entités sont créées !
 
@@ -99,12 +99,12 @@ Importez les deux moteurs logiques dans votre instance Home Assistant :
 
 Le projet inclut une vue complète basée sur la disposition moderne en **Sections** de Home Assistant (2024.3+). Elle organise les commandes et la télémétrie par colonnes (*État*, *Mode et commandes*, *Mesures*, *Historiques*, *Aide-mémoire*) tout en intégrant la **divulgation progressive** (la bannière rouge d'acquittement ne s'affiche qu'en cas de verrouillage actif).
 
-Le code complet est disponible dans le fichier [`dashboard/lovelace.yaml`](./dashboard/lovelace.yaml).
+Le code complet est disponible dans le fichier [`config/dashboard/lovelace.yaml`](.config//dashboard/lovelace.yaml).
 
 ### 🚀 Procédure d'installation :
 1. Dans Home Assistant, ouvrez votre tableau de bord puis cliquez sur **Éditer le tableau de bord** (trois points en haut à droite).
 2. Ouvrez le menu de l'éditeur et sélectionnez **Éditeur de configuration brut** (*Raw Configuration Editor*).
-3. Copiez le contenu du fichier [`dashboard/lovelace.yaml`](./dashboard/lovelace.yaml) de ce dépôt et collez-le dans votre configuration (ou ajoutez le bloc sous la clé `views:`).
+3. Copiez le contenu du fichier [`config/dashboard/lovelace.yaml`](.config//dashboard/lovelace.yaml) de ce dépôt et collez-le dans votre configuration (ou ajoutez le bloc sous la clé `views:`).
 4. Ajustez si nécessaire les identifiants d'entités spécifiques à votre installation (ex: `switch.shelly1g4_pompe_piscine_switch_0`, `sensor.temperature_piscine`). 
 
 ---
