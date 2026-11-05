@@ -1,0 +1,19 @@
+name: 💡 Demande de fonctionnalité
+description: Proposer une idée ou une amélioration pour la suite PCA.
+title: "[FEATURE]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: feature_description
+    attributes:
+      label: Description de l'idée
+      description: Expliquez la fonctionnalité souhaitée.
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Cas d'usage et valeur ajoutée
+      description: Pourquoi cette évolution serait-elle utile pour la gestion ou la sécurité du bassin ?
+    validations:
+      required: true
