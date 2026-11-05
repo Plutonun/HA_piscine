@@ -1,0 +1,237 @@
+title: Piscine
+views:
+  - title: Suivi
+    path: piscine
+    icon: mdi:pool
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: État
+            heading_style: title
+            icon: mdi:pool
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: input_boolean.piscine_verrou_defaut
+                state: 'on'
+            card:
+              type: vertical-stack
+              cards:
+                - type: markdown
+                  content: >-
+                    ## 🚨 POMPE VERROUILLÉE
+
+                    Un défaut a été détecté par **PCA Safety** (marche à sec,
+                    capteur de puissance perdu, relais collé ou unité inconnue).
+                    La pompe ne redémarrera pas tant que le verrou n'est pas
+                    acquitté.
+
+
+                    **Avant de déverrouiller** : vérifiez le niveau d'eau,
+                    l'amorçage de la pompe et l'état du disjoncteur. Consultez
+                    les notifications persistantes pour la cause exacte.
+                - type: tile
+                  entity: input_boolean.piscine_verrou_defaut
+                  name: Acquitter le défaut (déverrouiller)
+                  icon: mdi:lock-open-alert
+                  color: red
+                  tap_action:
+                    action: toggle
+                  icon_tap_action:
+                    action: toggle
+          - type: tile
+            entity: sensor.piscine_statut_filtration
+            name: Statut de la filtration
+            icon: mdi:pool
+            vertical: true
+          - type: tile
+            entity: switch.shelly1g4_pompe_piscine_switch_0
+            name: Pompe
+            icon: mdi:pump
+            vertical: true
+            tap_action:
+              action: more-info
+            icon_tap_action:
+              action: more-info
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: input_datetime.piscine_fin_filtration
+            name: Fin prévue
+            icon: mdi:clock-end
+            vertical: true
+            tap_action:
+              action: more-info
+            grid_options:
+              columns: 6
+          - type: markdown
+            content: >-
+              ℹ️ Pour une marche ou un arrêt manuel, changez le **mode**
+              ci-contre (*Forcé* / *Inactif*). Une commande directe sur la pompe
+              est annulée en quelques secondes par le moteur.
+      - type: grid
+        cards:
+          - type: heading
+            heading: Mode et commandes
+            heading_style: title
+            icon: mdi:tune
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: input_select.piscine_mode
+                name: Mode de filtration
+                icon: mdi:tune
+              - entity: input_button.piscine_recalculer
+                name: Recalculer la filtration
+              - entity: input_number.piscine_duree_calculee
+                name: Durée théorique sur 24 h
+              - entity: input_datetime.piscine_fin_filtration
+                name: Fin de filtration prévue
+          - type: heading
+            heading: Régimes thermiques actifs
+            heading_style: subtitle
+          - type: tile
+            entity: input_boolean.piscine_mem_gel
+            name: Hors-gel
+            icon: mdi:snowflake-alert
+            color: blue
+            vertical: true
+            tap_action:
+              action: more-info
+            icon_tap_action:
+              action: more-info
+            grid_options:
+              columns: 4
+          - type: tile
+            entity: input_boolean.piscine_mem_canicule
+            name: Canicule
+            icon: mdi:weather-sunny-alert
+            color: red
+            vertical: true
+            tap_action:
+              action: more-info
+            icon_tap_action:
+              action: more-info
+            grid_options:
+              columns: 4
+          - type: tile
+            entity: input_boolean.piscine_mem_hivernage
+            name: Saison hiver
+            icon: mdi:snowflake
+            color: cyan
+            vertical: true
+            tap_action:
+              action: more-info
+            icon_tap_action:
+              action: more-info
+            grid_options:
+              columns: 4
+      - type: grid
+        cards:
+          - type: heading
+            heading: Mesures
+            heading_style: title
+            icon: mdi:gauge
+          - type: gauge
+            entity: sensor.temperature_piscine
+            name: Eau
+            min: 0
+            max: 35
+            needle: true
+            segments:
+              - from: 0
+                color: '#3b82f6'
+              - from: 10
+                color: '#06b6d4'
+              - from: 18
+                color: '#22c55e'
+              - from: 26
+                color: '#f59e0b'
+              - from: 28
+                color: '#ef4444'
+            grid_options:
+              columns: 6
+          - type: gauge
+            entity: sensor.mesure_piscine_power
+            name: Puissance
+            min: 0
+            max: 3000
+            needle: true
+            segments:
+              - from: 0
+                color: '#ef4444'
+              - from: 500
+                color: '#22c55e'
+              - from: 2200
+                color: '#f59e0b'
+            grid_options:
+              columns: 6
+          - type: gauge
+            entity: input_number.piscine_duree_calculee
+            name: Durée 24 h
+            unit: h
+            min: 0
+            max: 24
+            needle: true
+            segments:
+              - from: 0
+                color: '#3b82f6'
+              - from: 6
+                color: '#22c55e'
+              - from: 12
+                color: '#f59e0b'
+              - from: 24
+                color: '#ef4444'
+            grid_options:
+              columns: 12
+      - type: grid
+        cards:
+          - type: heading
+            heading: Historiques
+            heading_style: title
+            icon: mdi:chart-line
+          - type: history-graph
+            title: Températures (48 h)
+            hours_to_show: 48
+            entities:
+              - entity: sensor.temperature_piscine
+                name: Eau
+              - entity: sensor.temperature_exterieure
+                name: Air
+          - type: history-graph
+            title: Pompe et puissance (24 h)
+            hours_to_show: 24
+            entities:
+              - entity: switch.shelly1g4_pompe_piscine_switch_0
+                name: Pompe
+              - entity: sensor.mesure_piscine_power
+                name: Puissance
+              - entity: input_boolean.piscine_verrou_defaut
+                name: Verrou défaut
+      - type: grid
+        cards:
+          - type: heading
+            heading: Aide-mémoire
+            heading_style: title
+            icon: mdi:information-outline
+          - type: markdown
+            content: >-
+              **Modes**
+
+              - *Automatique* : durée selon la température, bascule hiver avec
+              hystérésis.
+
+              - *Courbe* : polynôme de la température, jamais la formule hiver.
+
+              - *Hivernage* : durée T/3, tout sur la plage de nuit si activé.
+
+              - *Forcé* : marche continue 24 h.
+
+              - *Inactif* : pompe arrêtée (le gel n'est alors plus protégé).
+
+
+              **Après un défaut** : corrigez la cause, puis acquittez le verrou
+              (bouton rouge en haut). Le retour du capteur ne déverrouille pas.
