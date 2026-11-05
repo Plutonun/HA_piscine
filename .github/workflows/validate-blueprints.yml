@@ -5,33 +5,55 @@ on:
     branches: [ main, master ]
     paths:
       - 'config/**'
+      - '*.md'
       - '.github/workflows/**'
   pull_request:
     branches: [ main, master ]
     paths:
       - 'config/**'
+      - '*.md'
 
 jobs:
-  yamllint:
-    name: 🔍 Lint Syntax YAML
+  markdownlint:
+    name: 📝 Lint Markdown (README)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout du code
         uses: actions/checkout@v5
 
-      - name: Exécution de Yamllint
+      - name: Validation des fichiers Markdown
+        uses: davidanson/markdownlint-cli2-action@v19
+        with:
+          globs: |
+            README.md
+            **/*.md
+
+  yamllint:
+    name: 🔍 Lint Syntax (Blueprints & Packages)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v5
+
+      - name: Lint des Blueprints
         uses: ibiqlik/action-yamllint@v3
         with:
-          file_or_dir: config/
+          file_or_dir: config/blueprints/
           config_data: |
             extends: relaxed
             rules:
               line-length: disable
               truthy: disable
-              document-start: disable
-              braces:
-                min-spaces-inside: 0
-                max-spaces-inside: 1
+
+      - name: Lint des Packages (Helpers)
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: config/packages/
+          config_data: |
+            extends: relaxed
+            rules:
+              line-length: disable
+              truthy: disable
 
   ha_validation:
     name: 🏠 Validation Home Assistant Core
