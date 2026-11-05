@@ -391,7 +391,7 @@ variables:
   valid_modes: ['Courbe', 'Hivernage', 'Automatique', 'Forcé', 'Inactif']
   mode_raw: "{{ states(mode_filtr) }}"
   mode_val: "{{ mode_raw if mode_raw in valid_modes else 'Automatique' }}"
-  
+
   pump_is_on: "{{ is_state(pompe_ent, 'on') }}"
   is_locked: "{{ is_state(verrou_ent, 'on') }}"
   pump_blocked: "{{ (is_locked | bool) or mode_val == 'Inactif' }}"
