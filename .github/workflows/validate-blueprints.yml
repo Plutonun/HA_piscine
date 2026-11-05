@@ -1,0 +1,46 @@
+name: 🧪 Validate Blueprints
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'blueprints/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'blueprints/**'
+
+jobs:
+  yamllint:
+    name: 🔍 Lint Syntax YAML
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Exécution de Yamllint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: config/blueprints/
+          config_data: |
+            extends: relaxed
+            rules:
+              line-length: disable
+              truthy: disable
+              document-start: disable
+              braces:
+                min-spaces-inside: 0
+                max-spaces-inside: 1
+
+  ha_validation:
+    name: 🏠 Validation Home Assistant Core
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Vérification de la configuration HA
+        uses: frenck/action-home-assistant@v1
+        with:
+          path: "config/blueprints"
