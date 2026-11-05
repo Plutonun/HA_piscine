@@ -1,0 +1,40 @@
+# ==========================================
+# Home Assistant - Données sensibles & runtime
+# ==========================================
+secrets.yaml
+home-assistant.log*
+*.db
+*.db-shm
+*.db-wal
+.storage/
+.cloud/
+deps/
+tts/
+__pycache__/
+*.pyc
+
+# ==========================================
+# Fichiers temporaires & sauvegardes
+# ==========================================
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# ==========================================
+# Fichiers Systèmes d'exploitation
+# ==========================================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ==========================================
+# Environnements & Éditeurs (VS Code, etc.)
+# ==========================================
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+.claude/
