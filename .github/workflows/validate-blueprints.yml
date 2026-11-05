@@ -1,15 +1,15 @@
-name: 🧪 Validate Blueprints
+name: 🧪 Validate Blueprints & Config
 
 on:
   push:
     branches: [ main, master ]
     paths:
-      - 'blueprints/**'
+      - 'config/**'
       - '.github/workflows/**'
   pull_request:
     branches: [ main, master ]
     paths:
-      - 'blueprints/**'
+      - 'config/**'
 
 jobs:
   yamllint:
@@ -22,7 +22,7 @@ jobs:
       - name: Exécution de Yamllint
         uses: ibiqlik/action-yamllint@v3
         with:
-          file_or_dir: config/blueprints/
+          file_or_dir: config/
           config_data: |
             extends: relaxed
             rules:
