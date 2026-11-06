@@ -1,7 +1,7 @@
 blueprint:
   name: "🛡️ PCA Safety - Garde du corps électrique"
   description: |
-    # 🛡️ PCA Safety v2026.1
+    # 🛡️ PCA Safety v0.9.0-beta
     Surveille l'alimentation électrique de la pompe. Coupe directement la pompe et verrouille le système
     en cas de désamorçage, de marche à sec, de perte de communication ou d'unité inconnue.
 
