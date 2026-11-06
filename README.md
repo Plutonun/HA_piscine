@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/License-Apache_2.0-green.svg?style=for-the-badge)
 [![CI Status](https://img.shields.io/github/actions/workflow/status/Plutonun/HA_piscine/validate-blueprints.yml?branch=main&label=CI&style=for-the-badge&logo=github)](https://github.com/Plutonun/HA_piscine/actions/workflows/validate-blueprints.yml)
 [![Projet Maintenu](https://img.shields.io/badge/Maintained%3F-yes-brightgreen?style=for-the-badge)](https://github.com/Plutonun/HA_piscine/graphs/commit-activity)
-[![Dernière Release GitHub](https://img.shields.io/github/v/release/Plutonun/HA_piscine?style=for-the-badge&logo=github&color=blue)](https://github.com/Plutonun/HA_piscine/releases)
+[![Dernière Release GitHub](https://img.shields.io/github/v/release/Plutonun/HA_piscine?include_prereleases&style=for-the-badge&logo=github&color=blue)](https://github.com/Plutonun/HA_piscine/releases)
 
 **Pool Control Automation (PCA)** est une suite d'automatisations de niveau industriel pour Home Assistant, conçue pour piloter, optimiser et sécuriser la filtration de votre piscine.
 
